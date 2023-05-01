@@ -79,10 +79,28 @@ class playerBottom extends Schema {
 
 }
 
+export class Player extends Schema {
+  @type("number") x: number;
+  @type("number") y: number;
+  @type([Vec2]) speedQueue: ArraySchema;
+
+  constructor(xd: number = 0, yd: number = -377) {
+    super();
+    this.x = xd;
+    this.y = yd;
+
+    this.speedQueue = new ArraySchema<Vec2>();
+    for (let i = 0; i < 5; i++) {
+      this.speedQueue.push(new Vec2());
+    }
+  }
+}
+
 export class MyRoomState extends Schema {
   // @type({map: playerStriker}) players = new MapSchema<playerStriker>();
   @type(PuckState) PuckState = new PuckState();
   @type(playerInfo) playerInfo = new playerInfo();
-  @type(playerTop) playerTop = new playerTop();
-  @type(playerBottom) playerBottom = new playerBottom();
+  // @type(playerTop) playerTop = new playerTop();
+  // @type(playerBottom) playerBottom = new playerBottom();
+  @type({ map: Player }) players = new MapSchema<Player>();
 }
