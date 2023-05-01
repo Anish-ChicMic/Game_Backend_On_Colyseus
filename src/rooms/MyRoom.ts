@@ -99,15 +99,15 @@ export class MyRoom extends Room<MyRoomState> {
 
     if (client.sessionId === this.topPlayer) {
       console.log("top player left!");
-      // try {
-      //   if (consented) {
-      //     throw new Error("Consented Leave!");
-      //   }
-      //   await this.allowReconnection(client, 20);
-      // }
-      // catch (err) {
-      //   console.log("In catch block: ", err);
-      // }
+      try {
+        if (consented) {
+          throw new Error("Consented Leave!");
+        }
+        await this.allowReconnection(client, 20);
+      }
+      catch (err) {
+        console.log("In catch block: ", err);
+      }
       saveToDB(this.state.playerTop, { roomName: this.roomName, roomID: this.roomId }, this.topPlayer);
 
     }
