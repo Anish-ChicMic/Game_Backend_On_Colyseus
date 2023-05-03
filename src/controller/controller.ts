@@ -14,7 +14,7 @@ export let connectToDB = connect;
 export function saveToDB(playerState: any, roomData: any, sessionId: string) {
     // console.log(playerState.x);
     // console.log(roomData.roomID);
-    let data = dbScheme({
+    let data = dbScheme.playerSt({
         roomInfo: {
             roomName: roomData.roomName,
             roomId: roomData.roomID
@@ -28,5 +28,16 @@ export function saveToDB(playerState: any, roomData: any, sessionId: string) {
 
     // saveData(data);
     model.saveData(data);
+}
 
+export function savePlayerCredentials(data: any) {
+    console.log("In Controller ::::::::::::::: ", data);
+    let credData = dbScheme({
+        name: data.name,
+        email: data.email,
+        userID: data.userID,
+        accessToken: data.accessToken
+    });
+
+    model.savePlayerCred(credData);
 }

@@ -36,6 +36,7 @@
     "colyseus": "^0.14.20",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
-    "express": "^4.16.4"
+    "express": "^4.16.4",
+    "jsonwebtoken": "^9.0.0"
   }
 }
