@@ -1,11 +1,8 @@
-import { schema } from "../modles/dbSchema/schema";
+import { playerState, playerCredentials, roomStateDB } from "../modles/dbSchema/schema";
 import { connect } from "../modles/model";
-import { MyRoomState, Vec2 } from "../rooms/schema/MyRoomState";
-// import { type, Schema, MapSchema, ArraySchema } from '@colyseus/schema';
 const dbScheme = require('../modles/dbSchema/schema')
 const model = require('../modles/model')
-const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
+
 
 // export function 
 export let connectToDB = connect;
@@ -14,7 +11,7 @@ export let connectToDB = connect;
 export function saveToDB(playerState: any, roomData: any, sessionId: string) {
     // console.log(playerState.x);
     // console.log(roomData.roomID);
-    let data = dbScheme.playerSt({
+    let data = dbScheme({
         roomInfo: {
             roomName: roomData.roomName,
             roomId: roomData.roomID
@@ -26,7 +23,6 @@ export function saveToDB(playerState: any, roomData: any, sessionId: string) {
         }
     });
 
-    // saveData(data);
     model.saveData(data);
 }
 
@@ -40,4 +36,19 @@ export function savePlayerCredentials(data: any) {
     });
 
     model.savePlayerCred(credData);
+}
+
+
+export function saveRoomState(data: any) {
+
+    let roomState = new roomStateDB({
+        RoomName: data.RoomName,
+        RoomID: data.RoomID,
+        CountTotalPlayersJoined: data.CountTotalPlayersJoined,
+        PlayersWhoJoinedTheRoom: data.PlayersWhoJoinedTheRoom,
+        PuckState: data.PuckState,
+        Players: data.Players
+    })
+
+    model.saveRoomStateToDB(roomState);
 }

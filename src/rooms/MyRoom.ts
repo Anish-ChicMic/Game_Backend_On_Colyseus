@@ -2,6 +2,7 @@ import { Room, Client, ServerError } from "colyseus";
 import { MyRoomState, Player, Vec2 } from "./schema/MyRoomState";
 import { ArraySchema } from '@colyseus/schema';
 import { connectToDB, saveToDB } from "../controller/controller";
+import { fetchRoomStateById, fetchUserIDByToken } from "../modles/model";
 
 const controller = require('../controller/controller');
 const model = require('../modles/model');
@@ -16,11 +17,22 @@ export class MyRoom extends Room<MyRoomState> {
   room: any;
   topPlayer: string = "";
   bottomPlayer: string = "";
+  totalPlayersInTheRoom: number = 0;
+  playerWhoJoinedTheRoom: Array<string> = [];
+  playerIdentity: any = {};
+  roomStateGotFromDB: Array<object>;
 
-  onCreate(options: any) {
+
+  async onCreate(options: any) {
     // connectToDB();
     this.isDBConnected = model.connect(); // MongoDB Connecting
+
+    console.log("<---------- ON CREATE ---------->")
     this.setState(new MyRoomState());
+    this.roomStateGotFromDB = await model.fetchRoomStateById('4tx79b7ZP');
+    console.log("this is fetched data: =>> ", this.roomStateGotFromDB[0]);
+    this.setRoomStateGotFromDB();
+
     this.setSimulationInterval((deltaTime) => this.update(deltaTime));
 
     // this.onMessage("strikerMoved", (client, data) => {
@@ -76,64 +88,51 @@ export class MyRoom extends Room<MyRoomState> {
 
   }
 
-
   async onAuth(client: any, options: any, request: any) {
 
-    // console.log("OnAuth Data: ", request.headers);
-    // console.log("==============", request.connection.remoteAddress);
-    if (!this.isDBConnected) {
-      await model.connect();
-    }
-    console.log(options);
+
+    if (!this.isDBConnected) { await model.connect(); }
+
     console.log("<---------- ON AUTH ---------->")
     let jwtSecretKey = process.env.JWT_SECRET_KEY;
     let data = options;
-
     if (data.accessToken) {
-      // If data.accessToken is present then it is a old user
-      //then validate it from DB
+      // If data.accessToken is present then he is an old user then validate his token
       try {
         const token = data.accessToken;
-
         const verified = jwt.verify(token, jwtSecretKey);
+
         if (verified) {
           console.log("User Authorized Successfully!");
+          let userFromDb = await model.fetchUserIDByToken(token);
+          this.playerIdentity[client.sessionId] = userFromDb.name;
+          console.log("this is userID:", userFromDb.name);
           return true;
         } else {
-          // Access Denied
           console.log("Access Denied!");
           return false;
         }
       }
       catch (error) {
-        // Access Denied
-        console.log("Access Denied!");
+        console.log("Some Error Occured while authorizing! Access Denied!");
         return false;
       }
 
     }
-    else {
-      // Else it is signUp request
-      // Genearate accessToken store it in DB and give it to user
-      const token = jwt.sign(data, jwtSecretKey);
-      data.time = Date();
-      data.accessToken = token;
-      console.log(data);
-      client.send("GetToken", { accessToken: token });
-      // controller.savePlayerCredentials(data);
-      return true;
-    }
-
 
   }
 
-
   onJoin(client: Client, options: any) {
     console.log(client.sessionId, "joined!");
-    console.log("This is client: ", client);
-    console.log("This is optiosn: ", options);
+    this.totalPlayersInTheRoom++;
+    this.playerWhoJoinedTheRoom.push(client.sessionId);
+    // console.log("This is client: ", client);
+    // console.log("This is optiosn: ", options);
     this.state.players.set(client.sessionId, new Player());
+    this.setPlayerOldState(client.sessionId, this.playerIdentity[client.sessionId]);
+    console.log("Old state settled!", this.playerIdentity[client.sessionId]);
     // this.state.players.get(client.sessionId);
+    this.broadcast("SomeoneJoinedOrLeaved", { playerCnt: this.totalPlayersInTheRoom });
 
     if (!this.topPlayer.length) {
       this.topPlayer = client.sessionId;
@@ -144,15 +143,16 @@ export class MyRoom extends Room<MyRoomState> {
       this.state.playerInfo.bottomPlayer = this.bottomPlayer;
     }
 
-    console.log("top: " + this.topPlayer);
-    console.log("bot: " + this.bottomPlayer);
+    // console.log("top: " + this.topPlayer);
+    // console.log("bot: " + this.bottomPlayer);
 
     console.log("Total Player in the Room: ", this.state.players.size);
   }
 
   async onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, "left!");
-
+    this.totalPlayersInTheRoom--;
+    this.broadcast("SomeoneJoinedOrLeaved", { playerCnt: this.totalPlayersInTheRoom });
 
     if (client.sessionId === this.topPlayer) {
       console.log("top player left!");
@@ -160,7 +160,8 @@ export class MyRoom extends Room<MyRoomState> {
         if (consented) {
           throw new Error("Consented Leave!");
         }
-        await this.allowReconnection(client, 20);
+        let isReconnected = await this.allowReconnection(client, 20);
+        console.log("IsReconnected ::: ", isReconnected);
       }
       catch (err) {
         console.log("In catch block: ", err);
@@ -169,12 +170,22 @@ export class MyRoom extends Room<MyRoomState> {
 
     }
     else {
-      console.log("top player left!");
+      // console.log("top player left!");
       // console.log(this.state.playerBottom);
     }
   }
 
-  onDispose() { console.log("room", this.roomId, "disposing..."); }
+  onDispose() {
+    console.log("room", this.roomId, "disposing...");
+    let roomStateData = this.getWholeRoomState();
+    // console.log("THIS IS ONDESPOSE: ", roomStateData);
+    // controller.saveRoomState(roomStateData);
+  }
+
+
+
+
+
 
   // Custom Event Function
   moveStriker(client: any, data: any) {
@@ -199,8 +210,69 @@ export class MyRoom extends Room<MyRoomState> {
 
   }
 
+  // Retreiving Room State to store it into DB
+  getWholeRoomState(): object {
+    console.log("Retreiving Room state!");
+
+    // Object Types
+    type roomStateType = { [key: string]: any };
+    type playerStateType = { [key: string]: any }
+
+    const roomState: roomStateType = {};
+
+    // Room Data
+    roomState.RoomName = this.roomName;
+    roomState.RoomID = this.roomId;
+    roomState.CountTotalPlayersJoined = this.playerWhoJoinedTheRoom.length;
+    roomState.PlayersWhoJoinedTheRoom = [];
+
+    // Puck State
+    roomState.PuckState = {};
+    roomState.PuckState.x = this.state.PuckState.x;
+    roomState.PuckState.y = this.state.PuckState.y;
+    roomState.PuckState.angularVelocity = this.state.PuckState.angularVelocity;
+    roomState.PuckState.velocityX = this.state.PuckState.velocityX;
+    roomState.PuckState.velocityY = this.state.PuckState.velocityY;
+
+    // Players State
+    roomState.Players = {};
+    this.playerWhoJoinedTheRoom.forEach((player) => {
+      let currPlayerState = this.state.players.get(player);
+      let state: playerStateType = {};
+      state.x = currPlayerState.x;
+      state.y = currPlayerState.y;
+      roomState.Players[this.playerIdentity[player]] = state;
+      roomState.PlayersWhoJoinedTheRoom.push(this.playerIdentity[player]);
+    });
+
+    return roomState;
+  }
+
+  // 
+  setRoomStateGotFromDB() {
+    let dbStateData: any = this.roomStateGotFromDB[0];
+    this.state.PuckState.x = dbStateData.PuckState.x;
+    this.state.PuckState.y = dbStateData.PuckState.y;
+    this.state.PuckState.angularVelocity = dbStateData.PuckState.angularVelocity;
+    this.state.PuckState.velocityX = dbStateData.PuckState.velocityX;
+    this.state.PuckState.velocityY = dbStateData.PuckState.velocityY;
+
+
+  }
+
+
+  setPlayerOldState(sessId: string, userName: string) {
+    let dbStateData: any = this.roomStateGotFromDB[0];
+    console.log("New Assigned Players iden: ", this.playerIdentity);
+    console.log("Db players info: ", dbStateData.Players);
+
+    console.log("Function Over! ", this.state.players);
+    let currPlayerState = this.state.players.get(sessId);
+    currPlayerState.x = dbStateData.Players[userName].x;
+    currPlayerState.y = dbStateData.Players[userName].y;
+  }
+
 }
 
-function validateToken(accessToken: any) {
-  throw new Error("Function not implemented.");
-}
+
+

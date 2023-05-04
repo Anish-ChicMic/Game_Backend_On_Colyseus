@@ -97,7 +97,6 @@ export class Player extends Schema {
 }
 
 export class MyRoomState extends Schema {
-  // @type({map: playerStriker}) players = new MapSchema<playerStriker>();
   @type(PuckState) PuckState = new PuckState();
   @type(playerInfo) playerInfo = new playerInfo();
   // @type(playerTop) playerTop = new playerTop();
