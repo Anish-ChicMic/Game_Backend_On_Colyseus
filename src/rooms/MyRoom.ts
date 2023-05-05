@@ -90,7 +90,6 @@ export class MyRoom extends Room<MyRoomState> {
 
   async onAuth(client: any, options: any, request: any) {
 
-
     if (!this.isDBConnected) { await model.connect(); }
 
     console.log("<---------- ON AUTH ---------->")
@@ -126,12 +125,9 @@ export class MyRoom extends Room<MyRoomState> {
     console.log(client.sessionId, "joined!");
     this.totalPlayersInTheRoom++;
     this.playerWhoJoinedTheRoom.push(client.sessionId);
-    // console.log("This is client: ", client);
-    // console.log("This is optiosn: ", options);
     this.state.players.set(client.sessionId, new Player());
     this.setPlayerOldState(client.sessionId, this.playerIdentity[client.sessionId]);
     console.log("Old state settled!", this.playerIdentity[client.sessionId]);
-    // this.state.players.get(client.sessionId);
     this.broadcast("SomeoneJoinedOrLeaved", { playerCnt: this.totalPlayersInTheRoom });
 
     if (!this.topPlayer.length) {
@@ -142,9 +138,6 @@ export class MyRoom extends Room<MyRoomState> {
       this.bottomPlayer = client.sessionId;
       this.state.playerInfo.bottomPlayer = this.bottomPlayer;
     }
-
-    // console.log("top: " + this.topPlayer);
-    // console.log("bot: " + this.bottomPlayer);
 
     console.log("Total Player in the Room: ", this.state.players.size);
   }
@@ -256,8 +249,6 @@ export class MyRoom extends Room<MyRoomState> {
     this.state.PuckState.angularVelocity = dbStateData.PuckState.angularVelocity;
     this.state.PuckState.velocityX = dbStateData.PuckState.velocityX;
     this.state.PuckState.velocityY = dbStateData.PuckState.velocityY;
-
-
   }
 
 
